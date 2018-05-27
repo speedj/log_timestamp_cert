@@ -26,13 +26,23 @@ logprefix=/var/log/radius/radacct
 
 cat /dev/null > $logprefix/$hashesfilename
 
+# list all files rotated yesterday and add its name and its sha1sum to a file
 \ls -1 $logprefix/*/*$yesterday* | while read file ; do sha1sum $file >> $logprefix/$hashesfilename; done
-echo "Verify using -> openssl ts -verify -data $logprefix/$hashesfilename -in $logprefix/$hashesfilename.tsr -CAfile cacert.pem -untrusted tsa.crt " >> $logprefix/$hashesfilename
+# Add information to how to verify 
+echo "Verify timestamp using -> openssl ts -reply -in $logprefix/$hashesfilename.tsr -text " >> $logprefix/$hashesfilename
+echo "---" >> $logprefix/$hashesfilename
+echo "Verify signature using -> openssl ts -verify -data $logprefix/$hashesfilename -in $logprefix/$hashesfilename.tsr -CAfile cacert.pem -untrusted tsa.crt " >> $logprefix/$hashesfilename
 
+# Create a Timestamp request
 openssl ts -query -data $logprefix/$hashesfilename -no_nonce -sha512 -cert -out $logprefix/$hashesfilename.tsq
 
+# Get a Timestamp response
 curl -H "Content-Type: application/timestamp-query" --data-binary '@'$logprefix/$hashesfilename.tsq https://freetsa.org/tsr > $logprefix/$hashesfilename.tsr
 
+# Remove the Timestamp query
+\rm $logprefix/$hashesfilename.tsq
+
+# Make a convenience copy of TSA certificates
 cp cacert.pem $logprefix/
 cp tsa.crt $logprefix/
 
